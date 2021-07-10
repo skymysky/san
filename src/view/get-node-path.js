@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 获取节点在组件树中的路径
- * @author errorrik(errorrik@gmail.com)
  */
 
 
@@ -13,6 +17,7 @@ var NodeType = require('./node-type');
  * @param {Node} node 节点对象
  * @return {Array}
  */
+/* istanbul ignore next */
 function getNodePath(node) {
     var nodePaths = [];
     var nodeParent = node;
@@ -27,7 +32,7 @@ function getNodePath(node) {
                 break;
 
             case NodeType.FOR:
-                nodePaths.unshift('for[' + nodeParent.anode.directives['for'].raw + ']'); // eslint-disable-line dot-notation
+                nodePaths.unshift('for[' + nodeParent.aNode.directives['for'].item + ']'); // eslint-disable-line dot-notation
                 break;
 
             case NodeType.SLOT:
@@ -39,7 +44,7 @@ function getNodePath(node) {
                 break;
 
             case NodeType.CMPT:
-                nodePaths.unshift('component[' + (nodeParent.subTag || 'root') + ']');
+                nodePaths.unshift('component[' + (nodeParent.source ? nodeParent.source.tagName : 'root') + ']');
                 break;
 
             case NodeType.TEXT:

@@ -87,7 +87,7 @@ describe("IfDirective", function () {
 
     it("position right when update", function (done) {
         var MyComponent = san.defineComponent({
-            template: '<div><b san-if="cond" title="errorrik">errorrik</b><u>uuu</u></div>'
+            template: '<div><b san-if="cond && 1" title="errorrik">errorrik</b><u>uuu</u></div>'
         });
         var myComponent = new MyComponent();
 
@@ -116,7 +116,7 @@ describe("IfDirective", function () {
 
     it("render when true, and update soon", function (done) {
         var MyComponent = san.defineComponent({
-            template: '<div><span san-if="cond" title="errorrik">errorrik</span></div>'
+            template: '<div><span san-if="cond || 0" title="errorrik">errorrik</span></div>'
         });
         var myComponent = new MyComponent();
         myComponent.data.set('cond', true);
@@ -365,6 +365,51 @@ describe("IfDirective", function () {
                 expect(wrap.getElementsByTagName('span').length).toBe(0);
                 var bs = wrap.getElementsByTagName('b');
                 expect(bs[0].title).toBe('nobody');
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                done();
+            });
+        });
+    });
+
+    it("else-if alias elif", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><span s-if="num > 10000" title="biiig">biiig</span>  \n'
+                + '<span s-else-if="num > 1000" title="biig">biig</span>  \n'
+                + '<span s-else-if="num > 100" title="big">big</span>  \n'
+                + ' <b s-else title="small">small</b></div>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                num: 300
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+
+        var spans = wrap.getElementsByTagName('span');
+        expect(spans.length).toBe(1);
+        expect(spans[0].title).toBe('big');
+        expect(wrap.getElementsByTagName('b').length).toBe(0);
+
+        myComponent.data.set('num', 30000);
+
+        san.nextTick(function () {
+            var spans = wrap.getElementsByTagName('span');
+            expect(spans.length).toBe(1);
+            expect(spans[0].title).toBe('biiig');
+            expect(wrap.getElementsByTagName('b').length).toBe(0);
+
+            myComponent.data.set('num', 10);
+            san.nextTick(function () {
+                var spans = wrap.getElementsByTagName('span');
+                expect(spans.length).toBe(0);
+                var bs = wrap.getElementsByTagName('b');
+                expect(bs[0].title).toBe('small');
 
                 myComponent.dispose();
                 document.body.removeChild(wrap);
@@ -1084,6 +1129,51 @@ describe("IfDirective", function () {
 
                 myComponent.dispose();
                 document.body.removeChild(wrap);
+                done();
+            });
+        });
+    });
+
+    it("with call expr", function (done) {
+
+        var MyComponent = san.defineComponent({
+            template: '<div><u s-if="isWorking(time)">work</u><b s-else>rest</b></div>',
+
+            isWorking: function (time) {
+                if (time < 9 || time > 18) {
+                    return false;
+                }
+
+                return true;
+            }
+        });
+        var myComponent = new MyComponent({
+            data: {
+                time: 8
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(wrap.getElementsByTagName('u').length).toBe(0);
+        expect(wrap.getElementsByTagName('b').length).toBe(1);
+
+        myComponent.data.set('time', 16);
+        san.nextTick(function () {
+
+            expect(wrap.getElementsByTagName('u').length).toBe(1);
+            expect(wrap.getElementsByTagName('b').length).toBe(0);
+            myComponent.data.set('time', 19);
+
+            san.nextTick(function () {
+                expect(wrap.getElementsByTagName('u').length).toBe(0);
+                expect(wrap.getElementsByTagName('b').length).toBe(1);
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+
                 done();
             });
         });

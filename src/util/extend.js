@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 属性拷贝
- * @author errorrik(errorrik@gmail.com)
  */
 
 /**
@@ -12,6 +16,7 @@
  */
 function extend(target, source) {
     for (var key in source) {
+        /* istanbul ignore else  */
         if (source.hasOwnProperty(key)) {
             var value = source[key];
             if (typeof value !== 'undefined') {

@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 元素子节点遍历操作类
- * @author errorrik(errorrik@gmail.com)
  */
 
 var removeEl = require('../browser/remove-el');
@@ -14,7 +18,7 @@ var removeEl = require('../browser/remove-el');
  * @param {HTMLElement} el 要遍历的元素
  */
 function DOMChildrenWalker(el) {
-    this.raw = [];
+    this.children = [];
     this.index = 0;
     this.target = el;
 
@@ -29,28 +33,28 @@ function DOMChildrenWalker(el) {
                     removeEl(child);
                 }
                 else {
-                    this.raw.push(child);
+                    this.children.push(child);
                 }
                 break;
 
             case 1:
             case 8:
-                this.raw.push(child);
+                this.children.push(child);
         }
 
         child = next;
     }
 
-    this.current = this.raw[this.index];
-    this.next = this.raw[this.index + 1];
+    this.current = this.children[this.index];
+    this.next = this.children[this.index + 1];
 }
 
 /**
  * 往下走一个元素
  */
 DOMChildrenWalker.prototype.goNext = function () {
-    this.current = this.raw[++this.index];
-    this.next = this.raw[this.index + 1];
+    this.current = this.children[++this.index];
+    this.next = this.children[this.index + 1];
 };
 // #[end]
 

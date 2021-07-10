@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 读取调用
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('./expr-type');
@@ -16,10 +20,12 @@ var readTertiaryExpr = require('./read-tertiary-expr');
  */
 function readCall(walker, defaultArgs) {
     walker.goUntil();
-    var ident = readAccessor(walker);
-    var args = [];
+    var result = readAccessor(walker);
 
+    var args;
     if (walker.goUntil(40)) { // (
+        args = [];
+
         while (!walker.goUntil(41)) { // )
             args.push(readTertiaryExpr(walker));
             walker.goUntil(44); // ,
@@ -29,11 +35,15 @@ function readCall(walker, defaultArgs) {
         args = defaultArgs;
     }
 
-    return {
-        type: ExprType.CALL,
-        name: ident,
-        args: args
-    };
+    if (args) {
+        result = {
+            type: ExprType.CALL,
+            name: result,
+            args: args
+        };
+    }
+
+    return result;
 }
 
 exports = module.exports = readCall;

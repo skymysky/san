@@ -38,6 +38,81 @@ describe("Form TwoWay Binding", function () {
 
     });
 
+    // see https://github.com/baidu/san/issues/495
+    it("text value with placeholder", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><input placeholder="中文" value="{=name=}"><b>{{name}}</b></div>',
+            attached: function () {
+                this.data.set('name', 'san');
+            }
+        })
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(wrap.getElementsByTagName('input')[0].value).toBe('');
+        expect(wrap.getElementsByTagName('b')[0].innerHTML).toBe('');
+
+        myComponent.nextTick(function () {
+            expect(wrap.getElementsByTagName('input')[0].value).toBe('san');
+            expect(wrap.getElementsByTagName('b')[0].innerHTML).toBe('san');
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+            done();
+        });
+    });
+
+    if (typeof window !== 'undefined' && window.CompositionEvent) {
+        it("text value input by compositionstart and compositionend", function (done) {
+            var defName = 'text value';
+
+            var MyComponent = san.defineComponent({
+                template: '<div><span title="{{name}}">{{name}}</span> <input value="{=name=}"/></div>'
+            });
+            var myComponent = new MyComponent();
+            myComponent.data.set('name', defName);
+
+            var wrap = document.createElement('div');
+            document.body.appendChild(wrap);
+            myComponent.attach(wrap);
+
+            var span = wrap.firstChild.firstChild;
+            var input = wrap.getElementsByTagName('input')[0];
+            expect(span.title).toBe(defName);
+
+            input.value = 'test' + (+new Date());
+            function doneSpec() {
+                var name = myComponent.data.get('name');
+
+                if (name !== defName) {
+                    expect(span.title).toBe(name);
+
+                    myComponent.dispose();
+                    document.body.removeChild(wrap);
+                    done();
+                    return;
+                }
+
+                setTimeout(doneSpec, 500);
+            }
+
+            triggerEvent(input, 'compositionend');
+            setTimeout(function () {
+                expect(myComponent.data.get('name')).toBe(defName);
+                expect(span.title).toBe(defName);
+
+                triggerEvent(input, 'compositionstart');
+                triggerEvent(input, 'compositionend');
+                setTimeout(doneSpec, 500);
+
+            }, 300)
+
+        });
+    }
+
     it("text value for xss", function (done) {
         var MyComponent = san.defineComponent({
             template: '<div><span>{{name}}</span> <input value="{=name=}"/><input value="{{name}}"/></div>'
@@ -165,8 +240,8 @@ describe("Form TwoWay Binding", function () {
         var textarea = wrap.getElementsByTagName('textarea')[0];
         expect(textarea.value).toBe(defName);
 
-        doneSpec();
         triggerEvent(textarea, 'input', 'added2')
+        setTimeout(doneSpec, 500);
 
 
         function doneSpec() {
@@ -210,7 +285,7 @@ describe("Form TwoWay Binding", function () {
 
         triggerEvent(inputs[1], 'input', 'added3');
 
-        doneSpec();
+        setTimeout(doneSpec, 500);
         function doneSpec() {
             var list = myComponent.data.get('list');
             if (list[0] !== 'errorrik' || list[1] !== 'varsha' || list[2] !== 'firede') {
@@ -1237,5 +1312,179 @@ describe("Form TwoWay Binding", function () {
                 done();
             }, 400);
         });
+    });
+
+    it("dynamic input type: radio", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div>'
+                + '<b>{{online}}</b>'
+                + '<label><input type="{{inputType}}" value="errorrik" checked="{=online=}" name="onliner">errorrik</label>'
+                + '<label><input type="{{inputType}}" value="varsha" checked="{=online=}" name="onliner">varsha</label>'
+                + '<label><input type="{{inputType}}" value="firede" checked="{=online=}" name="onliner">firede</label>'
+                + '</div>',
+
+            initData: function () {
+                return {
+                    online: 'varsha',
+                    inputType: 'radio'
+                };
+            }
+        });
+
+        var myComponent = new MyComponent();
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var inputs = wrap.getElementsByTagName('input');
+        expect(inputs[0].checked).toBe(false);
+        expect(inputs[1].checked).toBe(true);
+        expect(inputs[2].checked).toBe(false);
+        expect(wrap.getElementsByTagName('b')[0].innerHTML.indexOf('varsha')).toBe(0);
+
+
+        function doneSpec() {
+            var online = myComponent.data.get('online');
+            if (online !== 'varsha') {
+                var bEl = wrap.getElementsByTagName('b')[0];
+                expect(bEl.innerHTML.indexOf(online) >= 0).toBe(true);
+
+                var inputs = wrap.getElementsByTagName('input');
+                for (var i = 0; i < inputs.length; i++) {
+                    var input = inputs[i];
+                    expect(input.checked).toBe(online === input.value);
+                }
+
+                done();
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                return;
+            }
+
+            setTimeout(doneSpec, 500);
+        }
+
+        triggerEvent(inputs[0], 'click');
+
+        setTimeout(doneSpec, 500);
+
+    });
+
+    it("dynamic input type: checkbox", function (done) {
+        var MyComponent = san.defineComponent({
+            template: ''
+                + '<ul><li san-for="item in items">'
+                + '<u>{{item.label}} - {{item.values}}</u>'
+                + '<label san-for="box in item.datasource">'
+                + '<input type="{{inputType}}" value="{{box.value}}" checked="{=item.values=}"> {{box.title}}'
+                + '</label>'
+                + '</li></ul>'
+        });
+
+        var myComponent = new MyComponent({
+            data: {
+                inputType: 'checkbox',
+                items: [
+                    {
+                        label: 'A',
+                        datasource: [
+                            {
+                                title: 'foo',
+                                value: 'foo'
+                            },
+                            {
+                                title: 'bar',
+                                value: 'bar'
+                            }
+                        ],
+                        values: ['foo']
+                    }
+                ]
+            }
+        });
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var inputs = wrap.getElementsByTagName('input');
+        expect(inputs[0].checked).toBe(true);
+        expect(inputs[1].checked).toBe(false);
+
+        triggerEvent(inputs[1], 'click');
+        setTimeout(doneSpec, 500);
+
+        function doneSpec() {
+            var inputs = wrap.getElementsByTagName('input');
+            expect(inputs[0].checked).toBe(true);
+            expect(inputs[1].checked).toBe(true);
+            expect(myComponent.data.get('items[0].values')).toContain('foo');
+            expect(myComponent.data.get('items[0].values')).toContain('bar');
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+
+            done();
+        }
+
+    });
+
+    it("complex accessor which path item value change in runtime", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div>'
+                + '<ul><li san-for="item in list"><input type="text" value="{=item.name=}"><b>{{item.name}}</b></li></ul>'
+                + '<input type="text" value="{=list[o.idx].name=}"><a>{{list[o.idx].name}}</a></div>'
+        });
+
+        var myComponent = new MyComponent({
+            data: {
+                list: [
+                    { name: 'errorrik' },
+                    { name: 'justice' },
+                    { name: 'otakustay' }
+                ],
+                o: {idx: 1}
+            }
+        });
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var inputs = wrap.getElementsByTagName('input');
+        expect(inputs[0].value).toBe('errorrik');
+        expect(inputs[1].value).toBe('justice');
+        expect(inputs[2].value).toBe('otakustay');
+        expect(inputs[3].value).toBe('justice');
+
+        triggerEvent(inputs[3], 'input', 'e0');
+        setTimeout(function () {
+            expect(inputs[3].value).toBe('justicee0');
+            expect(inputs[1].value).toBe('justicee0');
+
+            myComponent.data.set('o.idx', 0);
+            myComponent.nextTick(function () {
+                expect(inputs[3].value).toBe('errorrik');
+                expect(wrap.getElementsByTagName('a')[0].innerHTML).toBe('errorrik');
+
+                triggerEvent(inputs[3], 'input', 'erik');
+                setTimeout(function () {
+                    expect(inputs[0].value).toBe('errorrikerik');
+                    expect(wrap.getElementsByTagName('a')[0].innerHTML).toBe('errorrikerik');
+                    expect(wrap.getElementsByTagName('b')[0].innerHTML).toBe('errorrikerik');
+
+                    triggerEvent(inputs[0], 'input', 'err');
+                    setTimeout(function () {
+                        expect(wrap.getElementsByTagName('a')[0].innerHTML).toBe('errorrikerikerr');
+                        expect(wrap.getElementsByTagName('b')[0].innerHTML).toBe('errorrikerikerr');
+                        expect(inputs[3].value).toBe('errorrikerikerr');
+
+                        myComponent.dispose();
+                        document.body.removeChild(wrap);
+
+                        done();
+                    }, 600)
+                }, 600)
+            });
+        }, 600);
+
     });
 });

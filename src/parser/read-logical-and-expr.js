@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 读取逻辑与表达式
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('./expr-type');
@@ -16,9 +20,9 @@ function readLogicalANDExpr(walker) {
     var expr = readEqualityExpr(walker);
     walker.goUntil();
 
-    if (walker.currentCode() === 38) { // &
+    if (walker.source.charCodeAt(walker.index) === 38) { // &
         if (walker.nextCode() === 38) {
-            walker.go(1);
+            walker.index++;
             return {
                 type: ExprType.BINARY,
                 operator: 76,
@@ -26,7 +30,7 @@ function readLogicalANDExpr(walker) {
             };
         }
 
-        walker.go(-1);
+        walker.index--;
     }
 
     return expr;

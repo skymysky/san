@@ -110,6 +110,29 @@ describe("Element", function () {
         document.body.removeChild(wrap);
     });
 
+    it("bind prop, no quotes", function () {
+        var MyComponent = san.defineComponent({
+            template: '<a><span title={{name}} class=text>{{name}}</span></a>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                name: 'errorrik'
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.firstChild.firstChild;
+        expect(span.getAttribute('title')).toBe('errorrik');
+        expect(span.className).toBe('text');
+        expect(span.innerHTML.indexOf('errorrik')).toBe(0);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
     it("bind prop, which has xxx- prefix", function (done) {
         var MyComponent = san.defineComponent({
             template: '<a data-name="{{name}}"><span data-name="{{name}}">{{name}}</span></a>'
@@ -200,6 +223,36 @@ describe("Element", function () {
         });
     });
 
+    it("bind class, auto expand array by filter", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<a><span class="{{extra|raw}}"></span></a>'
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('extra', ['msg-notice', 'msg-error']);
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.firstChild.firstChild;
+        expect(/(^| )msg-notice( |$)/.test(span.className)).toBeTruthy();
+        expect(/(^| )msg-error( |$)/.test(span.className)).toBeTruthy();
+
+        myComponent.data.set('extra', 'msg-error');
+
+
+        san.nextTick(function () {
+            expect(/(^| )msg( |$)/.test(span.className)).toBeFalsy();
+            expect(/(^| )msg-notice( |$)/.test(span.className)).toBeFalsy();
+            expect(/(^| )msg-error( |$)/.test(span.className)).toBeTruthy();
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+
+            done();
+        });
+    });
+
     it("bind class, auto expand array", function (done) {
         var MyComponent = san.defineComponent({
             template: '<a><span class="msg {{extra}}"></span></a>'
@@ -212,13 +265,50 @@ describe("Element", function () {
         myComponent.attach(wrap);
 
         var span = wrap.firstChild.firstChild;
-        expect(span.className).toBe('msg msg-notice msg-error');
+        expect(/(^| )msg( |$)/.test(span.className)).toBeTruthy();
+        expect(/(^| )msg-notice( |$)/.test(span.className)).toBeTruthy();
+        expect(/(^| )msg-error( |$)/.test(span.className)).toBeTruthy();
 
         myComponent.data.set('extra', 'msg-error');
 
 
         san.nextTick(function () {
-            expect(span.className).toBe('msg msg-error');
+            expect(/(^| )msg( |$)/.test(span.className)).toBeTruthy();
+            expect(/(^| )msg-notice( |$)/.test(span.className)).toBeFalsy();
+            expect(/(^| )msg-error( |$)/.test(span.className)).toBeTruthy();
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+
+            done();
+        });
+    });
+
+    it("bind style, auto expand object, only one expr", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<a><span style="{{extra}}"></span></a>'
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('extra', {
+            position: 'absolute',
+            display: 'none'
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.firstChild.firstChild;
+
+        expect(span.style.position).toBe('absolute');
+        expect(span.style.display).toBe('none');
+
+        myComponent.data.set('extra.display', 'block');
+
+
+        san.nextTick(function () {
+            expect(span.style.position).toBe('absolute');
+            expect(span.style.display).toBe('block');
 
             myComponent.dispose();
             document.body.removeChild(wrap);
@@ -256,7 +346,7 @@ describe("Element", function () {
         });
     });
 
-    it("bind style, auto expand object", function (done) {
+    it("bind style, auto expand object, in text", function (done) {
         var MyComponent = san.defineComponent({
             template: '<a><span style="position: absolute; display: {{display}}; {{extra}}"></span></a>'
         });
@@ -740,5 +830,437 @@ describe("Element", function () {
 
             done();
         });
+    });
+
+    it("html entity in text should decode collectly", function () {
+        var MyComponent = san.defineComponent({
+            template: '<div data-text="&lt;&amp;ddddd&quot;&gt;&#39;&#x00021;"></div>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(myComponent.el.getAttribute('data-text')).toBe('<&ddddd">\'!');
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("html entity support is limited", function () {
+        var entityStr = '&#39;&#x00021;&emsp;&ensp;&thinsp;&copy;&lt;p&gt;&reg;&lt;/p&gt;&reg;&zwnj;&zwj;&lt;&nbsp;&gt;&quot;&lll;';
+        var MyComponent = san.defineComponent({
+            template: '<u>' + entityStr + '</u>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var compare = document.createElement('u');
+        compare.innerHTML = entityStr;
+        document.body.appendChild(compare);
+
+        expect(myComponent.el.offsetWidth).toBe(compare.offsetWidth);
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+        document.body.removeChild(compare);
+    });
+
+    it("has only s-bind attr", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><input s-bind="inputProps"><u>{{inputProps.value}}</u></div>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                inputProps: {
+                    type: 'text',
+                    value: 'hello'
+                }
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var input = wrap.getElementsByTagName('input')[0];
+        var u = wrap.getElementsByTagName('u')[0];
+        expect(input.value).toBe('hello');
+        expect(u.innerHTML).toContain('hello');
+
+        myComponent.data.set('inputProps.value', 'mygod');
+        myComponent.nextTick(function () {
+            expect(input.value).toBe('mygod');
+            expect(u.innerHTML).toContain('mygod');
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+            done();
+        });
+
+    });
+
+    it("has s-bind with other attr, confilct", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><a s-bind="aProps" target="{{target}}">link</a></div>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                aProps: {
+                    title: 'link',
+                    href: 'http://www.baidu.com/',
+                    target: '_top',
+                    'data-test': 'test'
+                },
+                target: '_blank'
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var a = wrap.getElementsByTagName('a')[0];
+        expect(a.title).toBe('link');
+        expect(a.target).toBe('_blank');
+        expect(a.href).toContain('baidu');
+        expect(a.getAttribute('data-test')).toContain('test');
+
+        myComponent.data.set('aProps', {
+            href: 'https://github.com/',
+            target: '_self'
+        });
+        myComponent.nextTick(function () {
+            expect(a.title).toBeFalsy();
+            expect(a.target).toBe('_blank');
+            expect(a.href).toContain('github');
+            expect(a.getAttribute('data-test')).toBeFalsy();
+
+            myComponent.data.set('target', 'test');
+            myComponent.nextTick(function () {
+                expect(a.target).toBe('test');
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                done();
+            });
+        });
+
+    });
+
+    it("disabled attr for normal element", function () {
+        var MyComponent = san.defineComponent({
+            template: '<div><a disabled checked>san</a></div>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var a = wrap.getElementsByTagName('a')[0];
+
+        expect(a.hasAttribute('disabled')).toBeTruthy();
+        expect(a.hasAttribute('checked')).toBeTruthy();
+
+        // ie 是个 bt，什么元素都能 disabled
+        if (!/msie/i.test(navigator.userAgent)) {
+            expect(a.disabled).toBeFalsy();
+            expect(a.checked).toBeFalsy();
+        }
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("disabled attr for form element", function () {
+        var MyComponent = san.defineComponent({
+            template: '<div><button disabled>san</button></div>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var btn = wrap.getElementsByTagName('button')[0];
+        expect(btn.disabled).toBeTruthy();
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("type attr for button element", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><form action="https://www.baidu.com/"><input type="text" value="test" name="kw"><button type="button">nosubmit</button></form></div>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var btn = wrap.getElementsByTagName('button')[0];
+        expect(btn.getAttribute('type')).toBe('button');
+
+        triggerEvent(btn, 'click');
+        setTimeout(function () {
+            done();
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+        }, 2000)
+    });
+
+    it("s- and san- attr should be ignore", function () {
+        var MyComponent = san.defineComponent({
+            template: '<div><a s-b="b" san-c="c">test</a></div>'
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var a = wrap.getElementsByTagName('a')[0];
+        expect(a.hasAttribute('s-b')).toBeFalsy();
+        expect(a.hasAttribute('san-c')).toBeFalsy();
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("content attr interp valued null and undefined and false", function () {
+        var MyComponent = san.defineComponent({
+            template: '<div undef="a{{undef}}b" nul="a{{nul}}b" falsy="a{{falsy}}b">test</div>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                nul: null,
+                falsy: false
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(myComponent.el.getAttribute('undef')).toBe('ab');
+        expect(myComponent.el.getAttribute('nul')).toBe('ab');
+        expect(myComponent.el.getAttribute('falsy')).toBe('afalseb');
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("content attr with only one expr interp", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div undef="{{undef}}" nul="{{nul}}" falsy="{{falsy}}" truth="{{truth}}" estr="{{estr}}" zero="{{0}}">test</div>'
+        });
+        var myComponent = new MyComponent({
+            data: {
+                nul: null,
+                falsy: false,
+                truth: true,
+                estr: ''
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(myComponent.el.hasAttribute('undef')).toBeFalsy();
+        expect(myComponent.el.hasAttribute('nul')).toBeFalsy();
+        expect(myComponent.el.hasAttribute('falsy')).toBeTruthy();
+        expect(myComponent.el.hasAttribute('estr')).toBeTruthy();
+        expect(myComponent.el.getAttribute('falsy')).toBe('false');
+        expect(myComponent.el.getAttribute('estr')).toBe('');
+        expect(myComponent.el.getAttribute('zero')).toBe('0');
+
+        myComponent.data.set('nul', '');
+        myComponent.data.set('undef', '');
+        myComponent.nextTick(function () {
+            expect(myComponent.el.hasAttribute('undef')).toBeTruthy();
+            expect(myComponent.el.hasAttribute('nul')).toBeTruthy();
+            expect(myComponent.el.getAttribute('undef')).toBe('');
+            expect(myComponent.el.getAttribute('nul')).toBe('');
+
+            var undef;
+            myComponent.data.set('nul', null);
+            myComponent.data.set('undef', undef);
+
+            myComponent.nextTick(function () {
+                expect(myComponent.el.hasAttribute('undef')).toBeFalsy();
+                expect(myComponent.el.hasAttribute('nul')).toBeFalsy();
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                done();
+            });
+        });
+    });
+
+    it("s-bind includes null and undefined", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><a s-bind="sb">test</a></div>'
+        });
+        var undef;
+        var myComponent = new MyComponent({
+            data: {
+                sb: {
+                    nul: null,
+                    falsy: false,
+                    truth: true,
+                    estr: '',
+                    undef: undef,
+                    zero: 0
+                }
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var aEl = wrap.getElementsByTagName('a')[0];
+
+        expect(aEl.hasAttribute('undef')).toBeFalsy();
+        expect(aEl.hasAttribute('nul')).toBeFalsy();
+        expect(aEl.hasAttribute('falsy')).toBeTruthy();
+        expect(aEl.hasAttribute('estr')).toBeTruthy();
+        expect(aEl.getAttribute('falsy')).toBe('false');
+        expect(aEl.getAttribute('estr')).toBe('');
+        expect(aEl.getAttribute('zero')).toBe('0');
+
+        myComponent.data.set('sb.nul', '');
+        myComponent.data.set('sb.undef', '');
+        myComponent.nextTick(function () {
+            expect(aEl.hasAttribute('undef')).toBeTruthy();
+            expect(aEl.hasAttribute('nul')).toBeTruthy();
+            expect(aEl.getAttribute('undef')).toBe('');
+            expect(aEl.getAttribute('nul')).toBe('');
+
+            myComponent.data.set('sb.nul', null);
+            myComponent.data.set('sb.undef', undef);
+
+            myComponent.nextTick(function () {
+                expect(aEl.hasAttribute('undef')).toBeFalsy();
+                expect(aEl.hasAttribute('nul')).toBeFalsy();
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                done();
+            });
+        });
+    });
+
+    it("s-bind apply to component root element", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div s-bind="sb">test</div>'
+        });
+        var undef;
+        var myComponent = new MyComponent({
+            data: {
+                sb: {
+                    nul: null,
+                    falsy: false,
+                    truth: true,
+                    estr: '',
+                    undef: undef,
+                    zero: 0
+                }
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+
+        expect(myComponent.el.hasAttribute('undef')).toBeFalsy();
+        expect(myComponent.el.hasAttribute('nul')).toBeFalsy();
+        expect(myComponent.el.hasAttribute('falsy')).toBeTruthy();
+        expect(myComponent.el.hasAttribute('estr')).toBeTruthy();
+        expect(myComponent.el.getAttribute('falsy')).toBe('false');
+        expect(myComponent.el.getAttribute('estr')).toBe('');
+        expect(myComponent.el.getAttribute('zero')).toBe('0');
+
+        myComponent.data.set('sb.nul', '');
+        myComponent.data.set('sb.undef', '');
+        myComponent.nextTick(function () {
+            expect(myComponent.el.hasAttribute('undef')).toBeTruthy();
+            expect(myComponent.el.hasAttribute('nul')).toBeTruthy();
+            expect(myComponent.el.getAttribute('undef')).toBe('');
+            expect(myComponent.el.getAttribute('nul')).toBe('');
+
+            myComponent.data.set('sb.nul', null);
+            myComponent.data.set('sb.undef', undef);
+
+            myComponent.nextTick(function () {
+                expect(myComponent.el.hasAttribute('undef')).toBeFalsy();
+                expect(myComponent.el.hasAttribute('nul')).toBeFalsy();
+
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+                done();
+            });
+        });
+    });
+
+    it("show directive 4 display style", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><span s-show="num == 3">{{num}}</span></div>'
+        });
+        var myComponent = new MyComponent({
+            data: {num: 2}
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.getElementsByTagName('span')[0];
+        expect(span.style.display).toBe('none');
+
+        myComponent.data.set('num', 3);
+
+        myComponent.nextTick(function () {
+            expect(span.style.display).toBe('');
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+            done();
+        })
+    });
+
+    it("show directive 4 display style, mix style declaration", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<div><span s-show="num == 3" style="position:{{pos}}">{{num}}</span></div>'
+        });
+        var myComponent = new MyComponent({
+            data: {num: 2, pos: 'absolute'}
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.getElementsByTagName('span')[0];
+        expect(span.style.display).toBe('none');
+        expect(span.style.position).toBe('absolute');
+
+        myComponent.data.set('num', 3);
+        myComponent.data.set('pos', 'relative');
+
+        myComponent.nextTick(function () {
+            expect(span.style.display).toBe('');
+            expect(span.style.position).toBe('relative');
+
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+            done();
+        })
     });
 });

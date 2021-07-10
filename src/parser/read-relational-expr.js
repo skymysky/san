@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 读取关系判断表达式
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('./expr-type');
@@ -16,19 +20,19 @@ function readRelationalExpr(walker) {
     var expr = readAdditiveExpr(walker);
     walker.goUntil();
 
-    var code = walker.currentCode();
+    var code = walker.source.charCodeAt(walker.index);
     switch (code) {
         case 60: // <
         case 62: // >
             if (walker.nextCode() === 61) {
                 code += 61;
-                walker.go(1);
+                walker.index++;
             }
 
             return {
                 type: ExprType.BINARY,
                 operator: code,
-                segs: [expr, readRelationalExpr(walker)]
+                segs: [expr, readAdditiveExpr(walker)]
             };
     }
 

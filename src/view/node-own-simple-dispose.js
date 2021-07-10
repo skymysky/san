@@ -1,10 +1,14 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 简单执行销毁节点的行为
- * @author errorrik(errorrik@gmail.com)
  */
 
 var removeEl = require('../browser/remove-el');
-var nodeDispose = require('./node-dispose');
+var LifeCycle = require('./life-cycle');
 var elementDisposeChildren = require('./element-dispose-children');
 
 /**
@@ -13,13 +17,21 @@ var elementDisposeChildren = require('./element-dispose-children');
  * @param {boolean=} noDetach 是否不要把节点从dom移除
  */
 function nodeOwnSimpleDispose(noDetach) {
-    elementDisposeChildren(this, noDetach, 1);
+    elementDisposeChildren(this.children, noDetach, 1);
 
     if (!noDetach) {
         removeEl(this.el);
     }
 
-    nodeDispose(this);
+    this.el = null;
+    this.owner = null;
+    this.scope = null;
+    this.children = null;
+
+    this.lifeCycle = LifeCycle.disposed;
+    if (this._ondisposed) {
+        this._ondisposed();
+    }
 }
 
 exports = module.exports = nodeOwnSimpleDispose;

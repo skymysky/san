@@ -1,15 +1,16 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 数据类
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('../parser/expr-type');
 var evalExpr = require('./eval-expr');
 var DataChangeType = require('./data-change-type');
-var createAccessor = require('../parser/create-accessor');
 var parseExpr = require('../parser/parse-expr');
-var guid = require('../util/guid');
-var dataCache = require('./data-cache');
 
 /**
  * 数据类
@@ -19,7 +20,6 @@ var dataCache = require('./data-cache');
  * @param {Model?} parent 父级数据容器
  */
 function Data(data, parent) {
-    this.id = guid();
     this.parent = parent;
     this.raw = data || {};
     this.listeners = [];
@@ -100,7 +100,9 @@ Data.prototype.get = function (expr, callee) {
         return value;
     }
 
-    expr = parseExpr(expr);
+    if (typeof expr !== 'object') {
+        expr = parseExpr(expr);
+    }
 
     var paths = expr.paths;
     callee = callee || this;
@@ -126,41 +128,53 @@ Data.prototype.get = function (expr, callee) {
  * @inner
  * @param {Object|Array} source 要变更的源数据
  * @param {Array} exprPaths 属性路径
+ * @param {number} pathsStart 当前处理的属性路径指针位置
+ * @param {number} pathsLen 属性路径长度
  * @param {*} value 变更属性值
  * @param {Data} data 对应的Data对象
  * @return {*} 变更后的新数据
  */
-function immutableSet(source, exprPaths, value, data) {
-    if (exprPaths.length === 0) {
+function immutableSet(source, exprPaths, pathsStart, pathsLen, value, data) {
+    if (pathsStart >= pathsLen) {
         return value;
     }
 
-    var prop = evalExpr(exprPaths[0], data);
-    var result;
+    if (source == null) {
+        source = {};
+    }
+
+    var pathExpr = exprPaths[pathsStart];
+    var prop = evalExpr(pathExpr, data);
+    var result = source;
 
     if (source instanceof Array) {
         var index = +prop;
+        prop = isNaN(index) ? prop : index;
 
         result = source.slice(0);
-        result[isNaN(index) ? prop : index] = immutableSet(source[index], exprPaths.slice(1), value, data);
-
-        return result;
+        result[prop] = immutableSet(source[prop], exprPaths, pathsStart + 1, pathsLen, value, data);
     }
     else if (typeof source === 'object') {
         result = {};
 
         for (var key in source) {
-            if (key !== prop) {
+            /* istanbul ignore else  */
+            if (key !== prop && source.hasOwnProperty(key)) {
                 result[key] = source[key];
             }
         }
 
-        result[prop] = immutableSet(source[prop] || {}, exprPaths.slice(1), value, data);
-
-        return result;
+        result[prop] = immutableSet(source[prop], exprPaths, pathsStart + 1, pathsLen, value, data);
     }
 
-    return source;
+    if (pathExpr.value == null) {
+        exprPaths[pathsStart] = {
+            type: typeof prop === 'string' ? ExprType.STRING : ExprType.NUMBER,
+            value: prop
+        };
+    }
+
+    return result;
 }
 
 /**
@@ -186,12 +200,18 @@ Data.prototype.set = function (expr, value, option) {
     }
     // #[end]
 
-    if (this.get(expr) === value) {
+    if (this.get(expr) === value && !option.force) {
         return;
     }
 
-    dataCache.clear();
-    this.raw = immutableSet(this.raw, expr.paths, value, this);
+    expr = {
+        type: ExprType.ACCESSOR,
+        paths: expr.paths.slice(0)
+    };
+
+    var prop = expr.paths[0].value;
+    this.raw[prop] = immutableSet(this.raw[prop], expr.paths, 1, expr.paths.length, value, this);
+
     this.fire({
         type: DataChangeType.SET,
         expr: expr,
@@ -206,10 +226,34 @@ Data.prototype.set = function (expr, value, option) {
 };
 
 /**
+ * 批量设置数据
+ *
+ * @param {Object} source 待设置的数据集
+ * @param {Object=} option 设置参数
+ * @param {boolean} option.silent 静默设置，不触发变更事件
+ */
+Data.prototype.assign = function (source, option) {
+    option = option || {};
+
+    for (var key in source) { // eslint-disable-line
+        this.set(
+            {
+                type: ExprType.ACCESSOR,
+                paths: [
+                    {type: ExprType.STRING, value: key}
+                ]
+            },
+            source[key],
+            option
+        );
+    }
+};
+
+/**
  * 合并更新数据项
  *
  * @param {string|Object} expr 数据项路径
- * @param {Object} source 待合并的数据值
+ * @param {Object} source 待合并的数据
  * @param {Object=} option 设置参数
  * @param {boolean} option.silent 静默设置，不触发变更事件
  */
@@ -238,8 +282,9 @@ Data.prototype.merge = function (expr, source, option) {
 
     for (var key in source) { // eslint-disable-line
         this.set(
-            createAccessor(
-                expr.paths.concat(
+            {
+                type: ExprType.ACCESSOR,
+                paths: expr.paths.concat(
                     [
                         {
                             type: ExprType.STRING,
@@ -247,7 +292,7 @@ Data.prototype.merge = function (expr, source, option) {
                         }
                     ]
                 )
-            ),
+            },
             source[key],
             option
         );
@@ -263,8 +308,6 @@ Data.prototype.merge = function (expr, source, option) {
  * @param {boolean} option.silent 静默设置，不触发变更事件
  */
 Data.prototype.apply = function (expr, fn, option) {
-    option = option || {};
-
     // #[begin] error
     var exprRaw = expr;
     // #[end]
@@ -288,13 +331,7 @@ Data.prototype.apply = function (expr, fn, option) {
     }
     // #[end]
 
-    var value = fn(oldValue);
-
-    if (oldValue === value) {
-        return;
-    }
-
-    this.set(expr, value, option);
+    this.set(expr, fn(oldValue), option);
 };
 
 /**
@@ -320,19 +357,31 @@ Data.prototype.splice = function (expr, args, option) {
     }
     // #[end]
 
+    expr = {
+        type: ExprType.ACCESSOR,
+        paths: expr.paths.slice(0)
+    };
+
     var target = this.get(expr);
     var returnValue = [];
 
     if (target instanceof Array) {
         var index = args[0];
-        if (index < 0 || index > target.length) {
-            return;
+        var len = target.length;
+        if (index > len) {
+            index = len;
+        }
+        else if (index < 0) {
+            index = len + index;
+            if (index < 0) {
+                index = 0;
+            }
         }
 
         var newArray = target.slice(0);
         returnValue = newArray.splice.apply(newArray, args);
-        dataCache.clear();
-        this.raw = immutableSet(this.raw, expr.paths, newArray, this);
+
+        this.raw = immutableSet(this.raw, expr.paths, 0, expr.paths.length, newArray, this);
 
         this.fire({
             expr: expr,

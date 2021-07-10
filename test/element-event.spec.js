@@ -51,6 +51,36 @@ describe("Element-Event", function () {
 
     });
 
+    it("bind click to noexists method, dont throw error", function (done) {
+        var MyComponent = san.defineComponent({
+            template: '<a><span title="{{name}}" on-click="nothingclicker(name, email, $event)">{{name}}, please click here!</span></a>',
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('name', 'errorrik');
+        myComponent.data.set('email', 'errorrik@gmail.com');
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var span = wrap.firstChild.firstChild;
+        expect(span.getAttribute('title')).toBe('errorrik');
+
+        function doneSpec() {
+            done();
+            myComponent.dispose();
+            document.body.removeChild(wrap);
+        }
+
+        expect(function () {
+            triggerEvent(span, 'click');
+        }).not.toThrow();
+
+
+        setTimeout(doneSpec, 500);
+
+    });
+
     it("bind click fire default event when no args description, empty args description dont add default arg", function (done) {
         var clicked = 0;
 
@@ -288,6 +318,147 @@ describe("Element-Event", function () {
         }
 
         triggerEvent(span, 'click');
+
+        doneSpec();
+
+    });
+
+    it("arg string literal contains colon not means modifier", function (done) {
+        if (!document.addEventListener) {
+            done();
+            return;
+        }
+
+        var clicked = 0;
+        var MyComponent = san.defineComponent({
+            template: '<a><span title="{{name}}" on-click="clicker(\'te:st\')">{{name}}, please click here!</span></a>',
+
+            mainClicker: function () {
+                clicked++;
+            },
+
+            clicker: function (text) {
+                expect(text).toBe('te:st');
+                clicked++;
+            }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('name', 'errorrik');
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        function doneSpec() {
+
+            if (clicked) {
+                done();
+                myComponent.dispose();
+                document.body.removeChild(wrap);
+
+                return;
+            }
+
+            setTimeout(doneSpec, 500);
+        }
+
+        var span = wrap.getElementsByTagName('span')[0];
+        triggerEvent(span, 'click');
+
+        doneSpec();
+
+    });
+
+    it("stop modifier", function (done) {
+        var clicked = 0;
+        var MyComponent = san.defineComponent({
+            template: '<a on-click="mainClicker"><span on-click="stop:clicker">please click here!</span><b>{{name}}</b></a>',
+
+            mainClicker: function () {
+                this.data.set('name', 'erik');
+            },
+
+            clicker: function () {
+                clicked = 1;
+            }
+        });
+        var myComponent = new MyComponent({
+            data: {
+                name: 'errorrik'
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        var b = wrap.getElementsByTagName('b')[0];
+        expect(b.innerHTML).toBe('errorrik');
+
+        function doneSpec() {
+
+            if (clicked) {
+                expect(myComponent.data.get('name')).toBe('errorrik');
+                myComponent.nextTick(function () {
+                    expect(b.innerHTML).toBe('errorrik');
+
+                    myComponent.dispose();
+                    document.body.removeChild(wrap);
+                    done();
+                })
+
+                return;
+            }
+
+            setTimeout(doneSpec, 500);
+        }
+
+        triggerEvent(wrap.getElementsByTagName('span')[0], 'click');
+
+        doneSpec();
+
+    });
+
+    it("prevent modifier", function (done) {
+        var clicked = 0;
+        var MyComponent = san.defineComponent({
+            template: '<a on-click="prevent:mainClicker" href="https://www.baidu.com/">{{name}}</a>',
+
+            mainClicker: function () {
+                clicked = 1;
+                this.data.set('name', 'erik');
+            }
+        });
+        var myComponent = new MyComponent({
+            data: {
+                name: 'errorrik'
+            }
+        });
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(wrap.firstChild.innerHTML).toBe('errorrik');
+
+        function doneSpec() {
+
+            if (clicked) {
+                myComponent.nextTick(function () {
+                    expect(wrap.firstChild.innerHTML).toBe('erik');
+
+                    myComponent.dispose();
+                    document.body.removeChild(wrap);
+                    done();
+                })
+
+                return;
+            }
+
+            setTimeout(doneSpec, 500);
+        }
+
+        triggerEvent(wrap.firstChild, 'click');
 
         doneSpec();
 

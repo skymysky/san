@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 在下一个时间周期运行任务
- * @author errorrik(errorrik@gmail.com)
  */
 
 // 该方法参照了vue2.5.0的实现，感谢vue团队
@@ -35,6 +39,14 @@ var nextHandler;
 var isNativePromise = typeof Promise === 'function' && /native code/.test(Promise);
 
 /**
+ * 浏览器是否支持原生setImmediate
+ *
+ * @inner
+ * @type {boolean}
+ */
+var isNativeSetImmediate = typeof setImmediate === 'function' && /native code/.test(setImmediate);
+
+/**
  * 在下一个时间周期运行任务
  *
  * @inner
@@ -62,7 +74,8 @@ function nextTick(fn, thisArg) {
     };
 
     // 非标准方法，但是此方法非常吻合要求。
-    if (typeof setImmediate === 'function') {
+    /* istanbul ignore next */
+    if (isNativeSetImmediate) {
         setImmediate(nextHandler);
     }
     // 用MessageChannel去做setImmediate的polyfill

@@ -33,7 +33,7 @@ describe('parseTemplate', function () {
 
     var AUTO_CLOSE_TAGS = [
         'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-        'keygen', 'param', 'source', 'track', 'wbr'
+        'link', 'meta', 'param', 'source', 'track', 'wbr'
     ];
 
     var AUTO_CLOSE_TAGS_MAP = {};
@@ -187,27 +187,27 @@ describe('parseTemplate', function () {
 
     });
 
-    it('should throw error if attributes is not wrapped with "" or \'\'', function () {
+    it('should return normal ANode by not string', function () {
 
-        expect(function () {
-            san.parseTemplate('<div> <h1 title=aaa></h1> </div>');
-        }).toThrowError('[SAN ERROR] ROOT>div>h1 attribute `title` is not wrapped with ""');
+        expect(san.parseTemplate({}).children.length).toBe(0);
+    });
 
+    it('for syntax error', function () {
         expect(function () {
-            san.parseTemplate('<div><h1 title="aaa></h1> </div>');
-        }).toThrowError('[SAN ERROR] ROOT>div>h1 attribute `title` is not wrapped with ""');
+            var MyComponent = san.defineComponent({
+                template: '<ul><li s-for="item inlist">{{item}}</li></ul>'
+            });
+            new MyComponent();
+        }).toThrowError('[SAN FATAL] for syntax error: item inlist');
+    });
 
+    it('else not match if', function () {
         expect(function () {
-            san.parseTemplate('<div> <h1 title=aaa"></h1> </div>');
-        }).toThrowError('[SAN ERROR] ROOT>div>h1 attribute `title` is not wrapped with ""');
-
-        expect(function () {
-            san.parseTemplate('<div> <h1 title=\'aaa></h1> </div>');
-        }).toThrowError('[SAN ERROR] ROOT>div>h1 attribute `title` is not wrapped with ""');
-
-        expect(function () {
-            san.parseTemplate('<div> <h1 title=aaa\'></h1> </div>');
-        }).toThrowError('[SAN ERROR] ROOT>div>h1 attribute `title` is not wrapped with ""');
+            var MyComponent = san.defineComponent({
+                template: '<ul><li s-elif="cond">{{item}}</li></ul>'
+            });
+            new MyComponent();
+        }).toThrowError('[SAN FATEL] else not match if.');
     });
 
 });

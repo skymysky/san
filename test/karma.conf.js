@@ -19,7 +19,7 @@ module.exports = function(config) {
     files: [
       'test/lib/triggerEvent.js',
       'dist/san.dev.js',
-      'test/**/*.spec.js',
+      'test/**/*.spec.js'
     ],
 
 
@@ -28,11 +28,9 @@ module.exports = function(config) {
         'test/e2e/*spec.js',
     ],
 
-
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
-    preprocessors: {
-    },
+    preprocessors: {},
 
 
     // test results reporter to use
@@ -60,11 +58,11 @@ module.exports = function(config) {
 
     // start these browsers
     // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-    browsers: ['Chrome'],
+    browsers: ['ChromeHeadless'],
 
     customLaunchers: {
         Chrome_travis_ci: {
-            base: 'Chrome',
+            base: 'ChromeHeadless',
             flags: ['--no-sandbox']
         }
     },
@@ -82,19 +80,16 @@ module.exports = function(config) {
 
   if (process.argv.indexOf('--coverage') > -1) {
 
-    configuration.reporters.push('coverage');
-    configuration.preprocessors['dist/san.dev.js'] = 'coverage';
-    configuration.coverageReporter = {
-        type : 'html',
-        dir : 'coverage/'
+    configuration.reporters.push('coverage','karma-remap-istanbul');
+    configuration.preprocessors['dist/san.dev.js'] = ['coverage','sourcemap'];
+    configuration.remapIstanbulReporter = {
+        reports:{
+            html: 'coverage/html',
+            lcovonly: 'coverage/lcov.info',
+        }
     };
 
   }
-
-  if (process.env.TRAVIS) {
-    configuration.browsers = ['Chrome_travis_ci'];
-  }
-
 
   config.set(configuration);
 };

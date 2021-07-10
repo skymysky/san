@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 表达式类型
- * @author errorrik(errorrik@gmail.com)
  */
 
 /**
@@ -19,7 +23,10 @@ var ExprType = {
     TEXT: 7,
     BINARY: 8,
     UNARY: 9,
-    TERTIARY: 10
+    TERTIARY: 10,
+    OBJECT: 11,
+    ARRAY: 12,
+    NULL: 13
 };
 
 exports = module.exports = ExprType;

@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 读取加法表达式
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('./expr-type');
@@ -15,18 +19,24 @@ var readMultiplicativeExpr = require('./read-multiplicative-expr');
  */
 function readAdditiveExpr(walker) {
     var expr = readMultiplicativeExpr(walker);
-    walker.goUntil();
 
-    var code = walker.currentCode();
-    switch (code) {
-        case 43: // +
-        case 45: // -
-            walker.go(1);
-            return {
-                type: ExprType.BINARY,
-                operator: code,
-                segs: [expr, readAdditiveExpr(walker)]
-            };
+    while (1) {
+        walker.goUntil();
+        var code = walker.source.charCodeAt(walker.index);
+
+        switch (code) {
+            case 43: // +
+            case 45: // -
+                walker.index++;
+                expr = {
+                    type: ExprType.BINARY,
+                    operator: code,
+                    segs: [expr, readMultiplicativeExpr(walker)]
+                };
+                continue;
+        }
+
+        break;
     }
 
     return expr;

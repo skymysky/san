@@ -1,17 +1,19 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 完成元素 attached 后的行为
- * @author errorrik(errorrik@gmail.com)
  */
 
 
-var bind = require('../util/bind');
 var empty = require('../util/empty');
 var isBrowser = require('../browser/is-browser');
 var trigger = require('../browser/trigger');
 var NodeType = require('./node-type');
 var elementGetTransition = require('./element-get-transition');
-var eventDeclarationListener = require('./event-declaration-listener');
-var getPropHandler = require('./get-prop-handler');
+var getEventListener = require('./get-event-listener');
 var warnEventListenMethod = require('./warn-event-listen-method');
 
 /**
@@ -25,7 +27,6 @@ function inputOnCompositionEnd() {
     }
 
     this.composing = 0;
-
     trigger(this, 'input');
 }
 
@@ -38,17 +39,83 @@ function inputOnCompositionStart() {
     this.composing = 1;
 }
 
-function xPropOutputer(xProp, data) {
-    getPropHandler(this.tagName, xProp.name).output(this, xProp, data);
+function getXPropOutputer(element, xProp, data) {
+    return function () {
+        xPropOutput(element, xProp, data);
+    };
 }
 
-function inputXPropOutputer(element, xProp, data) {
-    var outputer = bind(xPropOutputer, element, xProp, data);
-    return function (e) {
+function getInputXPropOutputer(element, xProp, data) {
+    return function () {
+        // #[begin] allua
+        /* istanbul ignore if */
+        if (element.__bkph) {
+            element.__bkph = false;
+            return;
+        }
+        // #[end]
+
         if (!this.composing) {
-            outputer(e);
+            xPropOutput(element, xProp, data);
         }
     };
+}
+
+// #[begin] allua
+/* istanbul ignore next */
+function getInputFocusXPropHandler(element, xProp, data) {
+    return function () {
+        element._inputTimer = setInterval(function () {
+            xPropOutput(element, xProp, data);
+        }, 16);
+    };
+}
+
+/* istanbul ignore next */
+function getInputBlurXPropHandler(element) {
+    return function () {
+        clearInterval(element._inputTimer);
+        element._inputTimer = null;
+    };
+}
+// #[end]
+
+function xPropOutput(element, bindInfo, data) {
+    /* istanbul ignore if */
+    if (!element.lifeCycle.created) {
+        return;
+    }
+
+    var el = element.el;
+
+    if (element.tagName === 'input' && bindInfo.name === 'checked') {
+        var bindValue = getANodeProp(element.aNode, 'value');
+        var bindType = getANodeProp(element.aNode, 'type');
+
+        if (bindValue && bindType) {
+            switch (el.type.toLowerCase()) {
+                case 'checkbox':
+                    data[el.checked ? 'push' : 'remove'](bindInfo.expr, el.value);
+                    return;
+
+                case 'radio':
+                    el.checked && data.set(bindInfo.expr, el.value, {
+                        target: {
+                            node: element,
+                            prop: bindInfo.name
+                        }
+                    });
+                    return;
+            }
+        }
+    }
+
+    data.set(bindInfo.expr, el[bindInfo.name], {
+        target: {
+            node: element,
+            prop: bindInfo.name
+        }
+    });
 }
 
 /**
@@ -57,7 +124,9 @@ function inputXPropOutputer(element, xProp, data) {
  * @param {Object} element 元素节点
  */
 function elementOwnAttached() {
-    this._toPhase('created');
+    if (this._rootNode) {
+        return;
+    }
 
     var isComponent = this.nodeType === NodeType.CMPT;
     var data = isComponent ? this.data : this.scope;
@@ -80,15 +149,23 @@ function elementOwnAttached() {
                             this._onEl('compositionend', inputOnCompositionEnd);
                         }
 
-                        this._onEl(
-                            ('oninput' in this.el) ? 'input' : 'propertychange',
-                            inputXPropOutputer(this, xProp, data)
-                        );
+                        // #[begin] allua
+                        /* istanbul ignore else */
+                        if ('oninput' in this.el) {
+                        // #[end]
+                            this._onEl('input', getInputXPropOutputer(this, xProp, data));
+                        // #[begin] allua
+                        }
+                        else {
+                            this._onEl('focusin', getInputFocusXPropHandler(this, xProp, data));
+                            this._onEl('focusout', getInputBlurXPropHandler(this));
+                        }
+                        // #[end]
 
                         break;
 
                     case 'select':
-                        this._onEl('change', bind(xPropOutputer, this, xProp, data));
+                        this._onEl('change', getXPropOutputer(this, xProp, data));
                         break;
                 }
                 break;
@@ -99,28 +176,16 @@ function elementOwnAttached() {
                         switch (this.el.type) {
                             case 'checkbox':
                             case 'radio':
-                                this._onEl('click', bind(xPropOutputer, this, xProp, data));
+                                this._onEl('click', getXPropOutputer(this, xProp, data));
                         }
                 }
                 break;
         }
     }
 
-    // bind events
-    var events = isComponent
-        ? this.aNode.events.concat(this.nativeEvents)
-        : this.aNode.events;
-
-    for (var i = 0, l = events.length; i < l; i++) {
-        var eventBind = events[i];
-        var owner = isComponent ? this : this.owner;
-
-        // 判断是否是nativeEvent，下面的warn方法和事件绑定都需要
-        // 依此指定eventBind.expr.name位于owner还是owner.owner上
-        if (eventBind.modifier.native) {
-            owner = owner.owner;
-            data = this.scope || owner.data;
-        }
+    var owner = isComponent ? this : this.owner;
+    for (var i = 0, l = this.aNode.events.length; i < l; i++) {
+        var eventBind = this.aNode.events[i];
 
         // #[begin] error
         warnEventListenMethod(eventBind, owner);
@@ -128,28 +193,30 @@ function elementOwnAttached() {
 
         this._onEl(
             eventBind.name,
-            bind(
-                eventDeclarationListener,
-                owner,
-                eventBind,
-                0,
-                data
-            ),
+            getEventListener(eventBind, owner, data, eventBind.modifier),
             eventBind.modifier.capture
         );
     }
 
-    this._toPhase('attached');
+    if (isComponent) {
+        for (var i = 0, l = this.nativeEvents.length; i < l; i++) {
+            var eventBind = this.nativeEvents[i];
 
+            // #[begin] error
+            warnEventListenMethod(eventBind, this.owner);
+            // #[end]
 
-    if (this._isInitFromEl) {
-        this._isInitFromEl = false;
-    }
-    else {
-        var transition = elementGetTransition(this);
-        if (transition && transition.enter) {
-            transition.enter(this.el, empty);
+            this._onEl(
+                eventBind.name,
+                getEventListener(eventBind, this.owner, this.scope),
+                eventBind.modifier.capture
+            );
         }
+    }
+
+    var transition = elementGetTransition(this);
+    if (transition && transition.enter) {
+        transition.enter(this.el, empty);
     }
 }
 

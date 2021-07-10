@@ -1,11 +1,31 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 默认filter
- * @author errorrik(errorrik@gmail.com)
  */
 
 
 /* eslint-disable fecs-camelcase */
-/* eslint-disable guard-for-in */
+
+
+function defaultStyleFilter(source) {
+    if (typeof source === 'object') {
+        var result = '';
+        for (var key in source) {
+            /* istanbul ignore else  */
+            if (source.hasOwnProperty(key)) {
+                result += key + ':' + source[key] + ';';
+            }
+        }
+
+        return result;
+    }
+
+    return source;
+}
 
 /**
  * 默认filter
@@ -30,22 +50,35 @@ var DEFAULT_FILTERS = {
 
         return source;
     },
+    _style: defaultStyleFilter,
 
-    _style: function (source) {
-        if (typeof source === 'object') {
-            var result = '';
-            for (var key in source) {
-                result += key + ':' + source[key] + ';';
-            }
-
-            return result;
+    _xclass: function (outer, inner) {
+        if (outer instanceof Array) {
+            outer = outer.join(' ');
         }
 
-        return source;
+        if (outer) {
+            if (inner) {
+                return inner + ' ' + outer;
+            }
+
+            return outer;
+        }
+
+        return inner;
     },
 
-    _sep: function (source, sep) {
-        return source ? sep + source : source;
+    _xstyle: function (outer, inner) {
+        outer = outer && defaultStyleFilter(outer);
+        if (outer) {
+            if (inner) {
+                return inner + ';' + outer;
+            }
+
+            return outer;
+        }
+
+        return inner;
     }
 };
 /* eslint-enable fecs-camelcase */

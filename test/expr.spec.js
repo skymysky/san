@@ -38,6 +38,99 @@ describe("Expression", function () {
         document.body.removeChild(wrap);
     });
 
+    it("null", function () {
+        var MyComponent = san.defineComponent({
+            template: '<a><b s-if="nullValue === null">b</b></a>'
+        });
+        var myComponent = new MyComponent({ data: { nullValue: null }});
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        expect(wrap.getElementsByTagName('b').length).toBe(1);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary -", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{-val1 | tobe(-10)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('val1', 10);
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary +", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{+val1 | tobe(10)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('val1', '10');
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary +true", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{+true | tobe(1)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary +string", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{+"20" | tobe(20)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary +number", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{+5-2 | tobe(3)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
     it("unary !", function () {
         var MyComponent = san.defineComponent({
             template: '<b>{{!val1 | tobe(false)}}</b>',
@@ -45,6 +138,51 @@ describe("Expression", function () {
         });
         var myComponent = new MyComponent();
         myComponent.data.set('val1', 10);
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary !null", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{!null | tobe(true)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary !array", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{![] | tobe(false)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("unary !obj", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{!{} | tobe(false)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
 
         var wrap = document.createElement('div');
         document.body.appendChild(wrap);
@@ -326,6 +464,22 @@ describe("Expression", function () {
         document.body.removeChild(wrap);
     });
 
+    it("binary number <, no whitespaces between", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{val1<0 | tobe(!1)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('val1', 1);
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
     it("binary number >=", function () {
         var MyComponent = san.defineComponent({
             template: '<b>{{val1 >= val2 | tobe(!0)}}</b>',
@@ -561,6 +715,66 @@ describe("Expression", function () {
         });
 
         var myComponent = new MyComponent();
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("use san.Data and san.evalExpr", function () {
+        var parentData = new san.Data({
+            val1: 1,
+            val2: 1,
+            val3: 3,
+            val4: 4
+        });
+        var data = new san.Data({
+            val1: 3,
+            val2: 4,
+            arr: [1,2,3,4]
+        }, parentData);
+
+        expect(san.evalExpr(san.parseExpr('val1+val2'), data)).toBe(7);
+        expect(san.evalExpr(san.parseExpr('val3+val4'), data)).toBe(7);
+
+        expect(san.evalExpr(san.parseExpr('arr[val1] - arr[0] + 5'), data)).toBe(8);
+        expect(san.evalExpr(san.parseExpr('arr[val3] - arr[0] + 5'), data)).toBe(8);
+
+        data.push('arr', 100);
+
+        expect(san.evalExpr(san.parseExpr('arr[val2]-arr[0]+5'), data)).toBe(104);
+        expect(san.evalExpr(san.parseExpr('arr[val4]-arr[0]+5'), data)).toBe(104);
+    });
+
+    it("method", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{plus(val1) | tobe(3)}}</b>',
+            filters: { tobe: tobeFilter },
+            plus: function (a) {
+                return a + 1;
+            }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('val1', 2);
+
+        var wrap = document.createElement('div');
+        document.body.appendChild(wrap);
+        myComponent.attach(wrap);
+
+        myComponent.dispose();
+        document.body.removeChild(wrap);
+    });
+
+    it("not exists method", function () {
+        var MyComponent = san.defineComponent({
+            template: '<b>{{plus(val1) | tobe(undef)}}</b>',
+            filters: { tobe: tobeFilter }
+        });
+        var myComponent = new MyComponent();
+        myComponent.data.set('val1', 2);
+
         var wrap = document.createElement('div');
         document.body.appendChild(wrap);
         myComponent.attach(wrap);

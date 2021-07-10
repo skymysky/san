@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file SVG标签表
- * @author errorrik(errorrik@gmail.com)
  */
 
 var splitStr2Obj = require('../util/split-str-2-obj');
@@ -12,15 +16,33 @@ var splitStr2Obj = require('../util/split-str-2-obj');
  * @type {Object}
  */
 var svgTags = splitStr2Obj(''
-    // structure
-    + 'svg,g,defs,desc,metadata,symbol,use,'
-    // image & shape
-    + 'image,path,rect,circle,line,ellipse,polyline,polygon,'
-    // text
-    + 'text,tspan,tref,textpath,'
-    // other
-    + 'marker,pattern,clippath,mask,filter,cursor,view,animate,'
-    // font
-    + 'font,font-face,glyph,missing-glyph');
+    // Animation elements
+    + 'animate,animateMotion,animateTransform,'
+
+    // Basic shapes
+    + 'circle,ellipse,line,polygon,polyline,rect,'
+
+    // Container elements
+    + 'defs,g,marker,mask,missing-glyph,pattern,svg,symbol,'
+
+    // Descriptive elements
+    + 'desc,metadata,'
+
+    // Font elements
+    + 'font,font-face,'
+
+    // Gradient elements
+    + 'linearGradient,radialGradient,stop,'
+
+    // Graphics elements
+    + 'image,path,use,'
+
+    // Text elements
+    + 'glyph,textPath,text,tref,tspan,'
+
+    // Others
+    + 'clipPath,cursor,filter,foreignObject,view'
+);
+
 
 exports = module.exports = svgTags;

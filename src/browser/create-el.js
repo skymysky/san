@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file DOM创建
- * @author errorrik(errorrik@gmail.com)
  */
 
 var svgTags = require('./svg-tags');
@@ -12,7 +16,7 @@ var svgTags = require('./svg-tags');
  * @return {HTMLElement}
  */
 function createEl(tagName) {
-    if (svgTags[tagName]) {
+    if (svgTags[tagName] && document.createElementNS) {
         return document.createElementNS('http://www.w3.org/2000/svg', tagName);
     }
 

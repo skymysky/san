@@ -1,11 +1,14 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 比较变更表达式与目标表达式之间的关系
- * @author errorrik(errorrik@gmail.com)
  */
 
 var ExprType = require('../parser/expr-type');
 var evalExpr = require('./eval-expr');
-var each = require('../util/each');
 
 /**
  * 判断变更表达式与多个表达式之间的关系，0为完全没关系，1为有关系
@@ -41,27 +44,30 @@ function changeExprCompareExprs(changeExpr, exprs, data) {
  * @return {number}
  */
 function changeExprCompare(changeExpr, expr, data) {
+    // if (!expr.dynamic) {
+    //     return 0;
+    // }
+
     switch (expr.type) {
         case ExprType.ACCESSOR:
             var paths = expr.paths;
-            var len = paths.length;
+            var pathsLen = paths.length;
             var changePaths = changeExpr.paths;
             var changeLen = changePaths.length;
 
             var result = 1;
-            for (var i = 0; i < len; i++) {
+            for (var i = 0; i < pathsLen; i++) {
                 var pathExpr = paths[i];
+                var pathExprValue = pathExpr.value;
 
-                if (pathExpr.type === ExprType.ACCESSOR
-                    && changeExprCompare(changeExpr, pathExpr, data)
-                ) {
-                    return 1;
+                if (pathExprValue == null && changeExprCompare(changeExpr, pathExpr, data)) {
+                    result = 1;
+                    break;
                 }
 
                 if (result && i < changeLen
                     /* eslint-disable eqeqeq */
-                    && (pathExpr.value || evalExpr(pathExpr, data))
-                        != (changePaths[i].value || evalExpr(changePaths[i], data))
+                    && (pathExprValue || evalExpr(pathExpr, data)) != changePaths[i].value
                     /* eslint-enable eqeqeq */
                 ) {
                     result = 0;
@@ -69,7 +75,7 @@ function changeExprCompare(changeExpr, expr, data) {
             }
 
             if (result) {
-                result = Math.max(1, changeLen - len + 2);
+                result = Math.max(1, changeLen - pathsLen + 2);
             }
             return result;
 
@@ -82,18 +88,37 @@ function changeExprCompare(changeExpr, expr, data) {
         case ExprType.TERTIARY:
             return changeExprCompareExprs(changeExpr, expr.segs, data);
 
-        case ExprType.INTERP:
-            if (!changeExprCompare(changeExpr, expr.expr, data)) {
-                var filterResult;
-                each(expr.filters, function (filter) {
-                    filterResult = changeExprCompareExprs(changeExpr, filter.args, data);
-                    return !filterResult;
-                });
-
-                return filterResult ? 1 : 0;
+        case ExprType.ARRAY:
+        case ExprType.OBJECT:
+            for (var i = 0; i < expr.items.length; i++) {
+                if (changeExprCompare(changeExpr, expr.items[i].expr, data)) {
+                    return 1;
+                }
             }
 
-            return 1;
+            break;
+
+        case ExprType.INTERP:
+            if (changeExprCompare(changeExpr, expr.expr, data)) {
+                return 1
+            }
+            else {
+                for (var i = 0; i < expr.filters.length; i++) {
+                    if (changeExprCompareExprs(changeExpr, expr.filters[i].args, data)) {
+                        return 1;
+                    }
+                }
+            }
+
+            break;
+
+        case ExprType.CALL:
+            if (changeExprCompareExprs(changeExpr, expr.name.paths, data)
+                || changeExprCompareExprs(changeExpr, expr.args, data)
+            ) {
+                return 1
+            }
+            break;
     }
 
     return 0;

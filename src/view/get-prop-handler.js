@@ -1,11 +1,17 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 获取属性处理对象
- * @author errorrik(errorrik@gmail.com)
  */
 
 var contains = require('../util/contains');
 var empty = require('../util/empty');
+var nextTick = require('../util/next-tick');
 var svgTags = require('../browser/svg-tags');
+var ie = require('../browser/ie');
 var evalExpr = require('../runtime/eval-expr');
 var getANodeProp = require('./get-a-node-prop');
 var NodeType = require('./node-type');
@@ -36,44 +42,48 @@ var HTML_ATTR_PROP_MAP = {
  * @inner
  * @type {Object}
  */
-var defaultElementPropHandler = {
-    prop: function (el, value, name, element) {
-        var propName = HTML_ATTR_PROP_MAP[name] || name;
+function defaultElementPropHandler(el, value, name) {
+    var propName = HTML_ATTR_PROP_MAP[name] || name;
+    var valueNotNull = value != null;
 
-        // input 的 type 是个特殊属性，其实也应该用 setAttribute
-        // 但是 type 不应该运行时动态改变，否则会有兼容性问题
-        // 所以这里直接就不管了
-        if (svgTags[element.tagName] || !(propName in el)) {
-            el.setAttribute(name, value);
-        }
-        else {
-            el[propName] = value == null ? '' : value;
-        }
+    // input 的 type 是个特殊属性，其实也应该用 setAttribute
+    // 但是 type 不应该运行时动态改变，否则会有兼容性问题
+    // 所以这里直接就不管了
+    if (propName in el) {
+        el[propName] = valueNotNull ? value : '';
+    }
+    else if (valueNotNull) {
+        el.setAttribute(name, value);
+    }
 
-        // attribute 绑定的是 text，所以不会出现 null 的情况，这里无需处理
-        // 换句话来说，san 是做不到 attribute 时有时无的
-        // if (value == null) {
-        //     el.removeAttribute(name);
-        // }
-    },
+    if (!valueNotNull) {
+        el.removeAttribute(name);
+    }
+}
 
-    output: function (element, bindInfo, data) {
-        data.set(bindInfo.expr, element.el[bindInfo.name], {
-            target: {
-                id: element.id,
-                prop: bindInfo.name
-            }
+function svgPropHandler(el, value, name) {
+    el.setAttribute(name, value);
+}
+
+function boolPropHandler(el, value, name) {
+    var propName = HTML_ATTR_PROP_MAP[name] || name;
+    el[propName] = !!value;
+}
+
+// #[begin] allua
+// see https://github.com/baidu/san/issues/495
+function placeholderHandler(el, value, name, element) {
+    /* istanbul ignore if */
+    if (ie > 9 && !el.value && value) {
+        element.__bkph = true;
+        nextTick(function () {
+            element.__bkph = false;
         });
     }
-};
 
-var boolPropHandler = {
-    prop: function (el, value, name, element, prop) {
-        var propName = HTML_ATTR_PROP_MAP[name] || name;
-        el[propName] = !!(prop && prop.raw === ''
-            || value && value !== 'false' && value !== '0');
-    }
-};
+    defaultElementPropHandler(el, value, name);
+}
+// #[end]
 
 /* eslint-disable fecs-properties-quote */
 /**
@@ -83,26 +93,24 @@ var boolPropHandler = {
  * @type {Object}
  */
 var defaultElementPropHandlers = {
-    style: {
-        prop: function (el, value) {
-            el.style.cssText = value;
-        }
+    style: function (el, value) {
+        el.style.cssText = value;
     },
 
-    'class': { // eslint-disable-line
-        prop: function (el, value) {
+    'class': function (el, value) { // eslint-disable-line
+        if (
+            // #[begin] allua
+            ie
+            ||
+            // #[end]
+            el.className !== value
+        ) {
             el.className = value;
         }
     },
 
-    slot: {
-        prop: empty
-    },
+    slot: empty,
 
-    readonly: boolPropHandler,
-    disabled: boolPropHandler,
-    autofocus: boolPropHandler,
-    required: boolPropHandler,
     draggable: boolPropHandler
 };
 /* eslint-enable fecs-properties-quote */
@@ -114,7 +122,7 @@ var analInputChecker = {
     }
 };
 
-function analInputCheckedState(element, value, oper) {
+function analInputCheckedState(element, value) {
     var bindValue = getANodeProp(element.aNode, 'value');
     var bindType = getANodeProp(element.aNode, 'type');
 
@@ -123,13 +131,15 @@ function analInputCheckedState(element, value, oper) {
 
         if (analInputChecker[type]) {
             var bindChecked = getANodeProp(element.aNode, 'checked');
-            if (!bindChecked.hintExpr) {
+            if (bindChecked != null && !bindChecked.hintExpr) {
                 bindChecked.hintExpr = bindValue.expr;
             }
 
             return !!analInputChecker[type](
                 value,
-                evalExpr(bindValue.expr, element.scope, element.owner)
+                element.data
+                    ? evalExpr(bindValue.expr, element.data, element)
+                    : evalExpr(bindValue.expr, element.scope, element.owner)
             );
         }
     }
@@ -138,64 +148,78 @@ function analInputCheckedState(element, value, oper) {
 var elementPropHandlers = {
     input: {
         multiple: boolPropHandler,
-        checked: {
-            prop: function (el, value, name, element) {
-                var state = analInputCheckedState(element, value);
+        checked: function (el, value, name, element) {
+            var state = analInputCheckedState(element, value);
 
-                boolPropHandler.prop(
+            boolPropHandler(
+                el,
+                state != null ? state : value,
+                'checked',
+                element
+            );
+
+            // #[begin] allua
+            // 代码不用抽出来防重复，allua内的代码在现代浏览器版本会被编译时干掉，gzip也会处理重复问题
+            // see: #378
+            /* istanbul ignore if */
+            if (ie && ie < 8 && !element.lifeCycle.attached) {
+                boolPropHandler(
                     el,
                     state != null ? state : value,
-                    'checked',
+                    'defaultChecked',
                     element
                 );
-            },
-
-            output: function (element, bindInfo, data) {
-                var el = element.el;
-                var bindValue = getANodeProp(element.aNode, 'value');
-                var bindType = getANodeProp(element.aNode, 'type') || {};
-
-                if (bindValue && bindType) {
-                    switch (bindType.raw) {
-                        case 'checkbox':
-                            data[el.checked ? 'push' : 'remove'](bindInfo.expr, el.value);
-                            return;
-
-                        case 'radio':
-                            el.checked && data.set(bindInfo.expr, el.value, {
-                                target: {
-                                    id: element.id,
-                                    prop: bindInfo.name
-                                }
-                            });
-                            return;
-                    }
-                }
-
-                defaultElementPropHandler.output(element, bindInfo, data);
             }
-        }
+            // #[end]
+        },
+
+        // #[begin] allua
+        placeholder: placeholderHandler,
+        // #[end]
+
+        readonly: boolPropHandler,
+        disabled: boolPropHandler,
+        autofocus: boolPropHandler,
+        required: boolPropHandler
     },
 
     option: {
-        value: {
-            prop: function (el, value, name, element) {
-                defaultElementPropHandler.prop(el, value, name, element);
+        value: function (el, value, name, element) {
+            defaultElementPropHandler(el, value, name, element);
 
-                if (isOptionSelected(element, value)) {
-                    el.selected = true;
-                }
+            if (isOptionSelected(element, value)) {
+                el.selected = true;
             }
         }
     },
 
     select: {
-        value: {
-            prop: function (el, value) {
-                el.value = value || '';
-            },
+        readonly: boolPropHandler,
+        disabled: boolPropHandler,
+        autofocus: boolPropHandler,
+        required: boolPropHandler
+    },
 
-            output: defaultElementPropHandler.output
+    textarea: {
+        // #[begin] allua
+        placeholder: placeholderHandler,
+        // #[end]
+        readonly: boolPropHandler,
+        disabled: boolPropHandler,
+        autofocus: boolPropHandler,
+        required: boolPropHandler
+    },
+
+    button: {
+        disabled: boolPropHandler,
+        autofocus: boolPropHandler,
+        type: function (el, value) {
+            if (value != null) {
+                el.setAttribute('type', value);
+            }
+            else {
+                el.removeAttribute('type');
+            }
         }
     }
 };
@@ -240,6 +264,10 @@ function isOptionSelected(element, value) {
  * @return {Object}
  */
 function getPropHandler(tagName, attrName) {
+    if (svgTags[tagName]) {
+        return svgPropHandler;
+    }
+
     var tagPropHandlers = elementPropHandlers[tagName];
     if (!tagPropHandlers) {
         tagPropHandlers = elementPropHandlers[tagName] = {};

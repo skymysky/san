@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file DOM 事件挂载
- * @author errorrik(errorrik@gmail.com)
  */
 
 /**
@@ -14,6 +18,7 @@
  */
 function on(el, eventName, listener, capture) {
     // #[begin] allua
+    /* istanbul ignore else */
     if (el.addEventListener) {
     // #[end]
         el.addEventListener(eventName, listener, capture);

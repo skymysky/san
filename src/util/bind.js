@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file bind函数
- * @author errorrik(errorrik@gmail.com)
  */
 
 /**
@@ -21,7 +25,9 @@ function bind(func, thisArg) {
     // #[begin] allua
     }
 
+    /* istanbul ignore next */
     var args = slice.call(arguments, 2);
+    /* istanbul ignore next */
     return function () {
         return func.apply(thisArg, args.concat(slice.call(arguments)));
     };

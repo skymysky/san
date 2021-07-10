@@ -1,24 +1,18 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 解析文本
- * @author errorrik(errorrik@gmail.com)
  */
 
 var Walker = require('./walker');
+var readTertiaryExpr = require('./read-tertiary-expr');
 var ExprType = require('./expr-type');
-var parseInterp = require('./parse-interp');
+var readCall = require('./read-call');
+var decodeHTMLEntity = require('../util/decode-html-entity');
 
-/**
- * 对字符串进行可用于new RegExp的字面化
- *
- * @inner
- * @param {string} source 需要字面化的字符串
- * @return {string} 字符串字面化结果
- */
-function regexpLiteral(source) {
-    return source.replace(/[\^\[\]\$\(\)\{\}\?\*\.\+\\]/g, function (c) {
-        return '\\' + c;
-    });
-}
 
 /**
  * 解析文本
@@ -29,50 +23,93 @@ function regexpLiteral(source) {
  */
 function parseText(source, delimiters) {
     delimiters = delimiters || ['{{', '}}'];
-    var exprStartReg = new RegExp(
-        regexpLiteral(delimiters[0]) + '\\s*([\\s\\S]+?)\\s*' + regexpLiteral(delimiters[1]),
-        'ig'
-    );
-
-    var exprMatch;
 
     var walker = new Walker(source);
     var beforeIndex = 0;
 
-    var expr = {
-        type: ExprType.TEXT,
-        segs: []
-    };
+    var segs = [];
+    var original;
 
-    function pushStringToSeg(text) {
-        text && expr.segs.push({
-            type: ExprType.STRING,
-            value: text
-        });
-    }
+    var delimStart = delimiters[0];
+    var delimStartLen = delimStart.length;
+    var delimEnd = delimiters[1];
+    var delimEndLen = delimEnd.length;
+    while (1) {
+        var delimStartIndex = walker.source.indexOf(delimStart, walker.index);
+        var delimEndIndex = walker.source.indexOf(delimEnd, walker.index);
+        if (delimStartIndex === -1 || delimEndIndex < delimStartIndex) {
+            break;
+        }
 
-    while ((exprMatch = walker.match(exprStartReg)) != null) {
-        pushStringToSeg(walker.cut(
+        // pushStringToSeg
+        var strValue = walker.source.slice(
             beforeIndex,
-            walker.index - exprMatch[0].length
-        ));
+            delimStartIndex
+        );
+        strValue && segs.push({
+            type: ExprType.STRING,
+            value: decodeHTMLEntity(strValue)
+        });
 
-        var interp = parseInterp(exprMatch[1]);
-        expr.original = expr.original || interp.original;
+        // pushInterpToSeg
+        if (walker.source.indexOf(delimEnd, delimEndIndex + 1) === delimEndIndex + 1) {
+            delimEndIndex++;
+        }
 
-        expr.segs.push(interp);
-        beforeIndex = walker.index;
+        var interpWalker = new Walker(walker.source.slice(delimStartIndex + delimStartLen, delimEndIndex));
+        var interp = {
+            type: ExprType.INTERP,
+            expr: readTertiaryExpr(interpWalker),
+            filters: []
+        };
+        while (interpWalker.goUntil(124)) { // |
+            var callExpr = readCall(interpWalker, []);
+            switch (callExpr.name.paths[0].value) {
+                case 'html':
+                    break;
+                case 'raw':
+                    interp.original = 1;
+                    break;
+                default:
+                    interp.filters.push(callExpr);
+            }
+        }
+
+        original = original || interp.original;
+        segs.push(interp);
+
+        beforeIndex = walker.index = delimEndIndex + delimEndLen;
     }
 
-    pushStringToSeg(walker.cut(beforeIndex));
+    // pushStringToSeg
+    var strValue = walker.source.slice(beforeIndex);
+    strValue && segs.push({
+        type: ExprType.STRING,
+        value: decodeHTMLEntity(strValue)
+    });
 
+    switch (segs.length) {
+        case 0:
+            return {
+                type: ExprType.STRING,
+                value: ''
+            };
 
-
-    if (expr.segs.length === 1 && expr.segs[0].type === ExprType.STRING) {
-        expr.value = expr.segs[0].value;
+        case 1:
+            if (segs[0].type === ExprType.INTERP && segs[0].filters.length === 0 && !segs[0].original) {
+                return segs[0].expr;
+            }
+            return segs[0];
     }
 
-    return expr;
+    return original ? {
+        type: ExprType.TEXT,
+        segs: segs,
+        original: 1
+    } : {
+        type: ExprType.TEXT,
+        segs: segs
+    };
 }
 
 exports = module.exports = parseText;

@@ -1,10 +1,11 @@
 node_modules/
 dist/*.js
 dist/*.gz
+dist/*.map
 .idea/
 public/
 npm-debug.log
-package-lock.json
+/*/**/package-lock.json
 Thumbs.db
 .DS_Store
 *.swp
@@ -13,7 +14,9 @@ bug.html
 test.html
 coverage/
 errorShots/
-/test/index-ssr.html
-/test/ssr/ssr.spec.js
+/test/karma-context.html
+/test/index-reverse.html
+/test/reverse.spec.js
+/test/unpack-anode.spec.js
 /test/pref/tti.html
 *.vscode

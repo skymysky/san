@@ -1,10 +1,14 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 为函数调用计算参数数组的值
- * @author errorrik(errorrik@gmail.com)
  */
 
 
-var evalExpr = require('../runtime/eval-expr');
+var evalExpr = require('./eval-expr');
 
 /**
  * 为函数调用计算参数数组的值

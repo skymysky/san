@@ -1,33 +1,18 @@
 /**
- * @file 生成唯一id
- * @author errorrik(errorrik@gmail.com)
- */
-
-
-/**
- * 唯一id的起始值
+ * Copyright (c) Baidu Inc. All rights reserved.
  *
- * @inner
- * @type {number}
- */
-var guidIndex = 1;
-
-/**
- * 唯一id的前缀
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
  *
- * @inner
- * @type {string}
+ * @file 唯一id
  */
-var guidPrefix = (new Date()).getTime().toString(16).slice(8);
+
 
 /**
  * 获取唯一id
  *
- * @inner
- * @return {string} 唯一id
+ * @type {number} 唯一id
  */
-function guid() {
-    return '_' + guidPrefix + (guidIndex++);
-}
+var guid = 1;
 
 exports = module.exports = guid;

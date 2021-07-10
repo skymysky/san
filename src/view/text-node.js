@@ -1,8 +1,13 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file text 节点类
- * @author errorrik(errorrik@gmail.com)
  */
 
+var guid = require('../util/guid');
 var isBrowser = require('../browser/is-browser');
 var removeEl = require('../browser/remove-el');
 var insertBefore = require('../browser/insert-before');
@@ -17,13 +22,14 @@ var getNodePath = require('./get-node-path');
 /**
  * text 节点类
  *
+ * @class
  * @param {Object} aNode 抽象节点
- * @param {Component} owner 所属组件环境
- * @param {Model=} scope 所属数据环境
  * @param {Node} parent 父亲节点
+ * @param {Model} scope 所属数据环境
+ * @param {Component} owner 所属组件环境
  * @param {DOMChildrenWalker?} reverseWalker 子元素遍历对象
  */
-function TextNode(aNode, owner, scope, parent, reverseWalker) {
+function TextNode(aNode, parent, scope, owner, reverseWalker) {
     this.aNode = aNode;
     this.owner = owner;
     this.scope = scope;
@@ -36,12 +42,14 @@ function TextNode(aNode, owner, scope, parent, reverseWalker) {
             switch (currentNode.nodeType) {
                 case 8:
                     if (currentNode.data === 's-text') {
+                        this.id = this.id || guid++;
                         this.sel = currentNode;
                         currentNode.data = this.id;
                         reverseWalker.goNext();
 
                         while (1) { // eslint-disable-line
                             currentNode = reverseWalker.current;
+                            /* istanbul ignore if */
                             if (!currentNode) {
                                 throw new Error('[SAN REVERSE ERROR] Text end flag not found. \nPaths: '
                                     + getNodePath(this).join(' > '));
@@ -85,8 +93,12 @@ TextNode.prototype.nodeType = NodeType.TEXT;
  */
 TextNode.prototype.attach = function (parentEl, beforeEl) {
     this.content = evalExpr(this.aNode.textExpr, this.scope, this.owner);
+    if (this.content == null) {
+        this.content = '';
+    }
 
     if (this.aNode.textExpr.original) {
+        this.id = this.id || guid++;
         this.sel = document.createComment(this.id);
         insertBefore(this.sel, parentEl, beforeEl);
 
@@ -106,9 +118,15 @@ TextNode.prototype.attach = function (parentEl, beforeEl) {
 
 /**
  * 销毁 text 节点
+ *
+ * @param {boolean=} noDetach 是否不要把节点从dom移除
  */
-TextNode.prototype.dispose = function () {
-    this._prev = null;
+TextNode.prototype.dispose = function (noDetach) {
+    if (!noDetach) {
+        removeEl(this.el);
+        removeEl(this.sel);
+    }
+
     this.el = null;
     this.sel = null;
 };
@@ -128,10 +146,13 @@ TextNode.prototype._update = function (changes) {
         return;
     }
 
-    var len = changes ? changes.length : 0;
+    var len = changes.length;
     while (len--) {
         if (changeExprCompare(changes[len].expr, this.aNode.textExpr, this.scope)) {
             var text = evalExpr(this.aNode.textExpr, this.scope, this.owner);
+            if (text == null) {
+                text = '';
+            }
 
             if (text !== this.content) {
                 this.content = text;

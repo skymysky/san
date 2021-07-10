@@ -1,11 +1,10 @@
 /**
- * San
- * Copyright 2016 Baidu Inc. All rights reserved.
+ * Copyright (c) Baidu Inc. All rights reserved.
  *
- * @file 主文件
- * @author errorrik(errorrik@gmail.com)
- *         otakustay(otakustay@gmail.com)
- *         junmer(junmer@foxmail.com)
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
+ * @file San 主文件
  */
 
 (function (root) {
@@ -30,19 +29,15 @@
     // require('./util/data-types.js');
     // require('./util/create-data-types-checker.js');
     // require('./parser/walker');
-    // require('./parser/create-a-node');
     // require('./parser/parse-template');
     // require('./runtime/change-expr-compare');
     // require('./runtime/data-change-type');
-    // require('./runtime/data');
-    // require('./runtime/escape-html');
     // require('./runtime/default-filters');
-    // require('./runtime/eval-expr');
     // require('./view/life-cycle');
     // require('./view/node-type');
     // require('./view/get-prop-handler');
     // require('./view/is-data-change-by-element');
-    // require('./view/event-declaration-listener');
+    // require('./view/get-event-listener');
     // require('./view/create-node');
 
 
@@ -53,13 +48,16 @@
     var parseTemplate = require('./parser/parse-template');
     var parseExpr = require('./parser/parse-expr');
     var ExprType = require('./parser/expr-type');
+    var unpackANode = require('./parser/unpack-anode');
     var LifeCycle = require('./view/life-cycle');
     var NodeType = require('./view/node-type');
     var Component = require('./view/component');
-    var compileComponent = require('./view/compile-component');
+    var parseComponentTemplate = require('./view/parse-component-template');
     var defineComponent = require('./view/define-component');
+    var createComponentLoader = require('./view/create-component-loader');
     var emitDevtool = require('./util/emit-devtool');
-    var compileJSSource = require('./view/compile-js-source');
+    var Data = require('./runtime/data');
+    var evalExpr = require('./runtime/eval-expr');
     var DataTypes = require('./util/data-types');
 
 
@@ -80,34 +78,6 @@
         debug: true,
         // #[end]
 
-        // #[begin] ssr
-        /**
-         * 将组件类编译成 renderer 方法
-         *
-         * @param {Function} ComponentClass 组件类
-         * @return {function(Object):string}
-         */
-        compileToRenderer: function (ComponentClass) {
-            var renderer = ComponentClass.__ssrRenderer;
-
-            if (!renderer) {
-                var code = compileJSSource(ComponentClass);
-                renderer = (new Function('return ' + code))();
-                ComponentClass.__ssrRenderer = renderer;
-            }
-
-            return renderer;
-        },
-
-        /**
-         * 将组件类编译成 renderer 方法的源文件
-         *
-         * @param {Function} ComponentClass 组件类
-         * @return {string}
-         */
-        compileToSource: compileJSSource,
-        // #[end]
-
         /**
          * 组件基类
          *
@@ -124,11 +94,31 @@
         defineComponent: defineComponent,
 
         /**
-         * 编译组件类。预解析template和components
+         * 创建组件Loader
+         *
+         * @param {Object|Function} options 创建组件Loader的参数。为Object时参考下方描述，为Function时代表load方法。
+         * @param {Function} options.load load方法
+         * @param {Function=} options.placeholder loading过程中渲染的占位组件
+         * @param {Function=} options.fallback load失败时渲染的组件
+         * @return {ComponentLoader}
+         */
+        createComponentLoader: createComponentLoader,
+
+        /**
+         * 解析组件 template
          *
          * @param {Function} ComponentClass 组件类
+         * @return {ANode}
          */
-        compileComponent: compileComponent,
+        parseComponentTemplate: parseComponentTemplate,
+
+        /**
+         * 解压缩 ANode
+         *
+         * @param {Array} source ANode 压缩数据
+         * @return {Object}
+         */
+        unpackANode: unpackANode,
 
         /**
          * 解析 template
@@ -174,6 +164,25 @@
          * @param {Function} fn 要运行的函数
          */
         nextTick: nextTick,
+
+        /**
+         * 数据类
+         *
+         * @class
+         * @param {Object?} data 初始数据
+         * @param {Data?} parent 父级数据对象
+         */
+        Data: Data,
+
+        /**
+         * 计算表达式的值
+         *
+         * @param {Object} expr 表达式对象
+         * @param {Data} data 数据对象
+         * @param {Component=} owner 组件对象，用于表达式中filter的执行
+         * @return {*}
+         */
+        evalExpr: evalExpr,
 
         /**
          * 构建类之间的继承关系

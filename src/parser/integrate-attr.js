@@ -1,17 +1,20 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 解析抽象节点属性
- * @author errorrik(errorrik@gmail.com)
  */
 
 var each = require('../util/each');
 var kebab2camel = require('../util/kebab2camel');
+var boolAttrs = require('../browser/bool-attrs');
 var ExprType = require('./expr-type');
-var createAccessor = require('./create-accessor');
 var parseExpr = require('./parse-expr');
 var parseCall = require('./parse-call');
 var parseText = require('./parse-text');
 var parseDirective = require('./parse-directive');
-var postProp = require('./post-prop');
 
 
 /**
@@ -55,19 +58,22 @@ function integrateAttr(aNode, name, value, options) {
             }
 
             event.expr = parseCall(value, [
-                createAccessor([
-                    { type: ExprType.STRING, value: '$event' }
-                ])
+                {
+                    type: ExprType.ACCESSOR,
+                    paths: [
+                        {type: ExprType.STRING, value: '$event'}
+                    ]
+                }
             ]);
             break;
 
         case 'san':
         case 's':
-            parseDirective(aNode, realName, value, options);
-            break;
-
-        case 'prop':
-            integrateProp(aNode, realName, value, options);
+            if (realName === 'else-if') {
+                realName = 'elif';
+            }
+            var directiveValue = parseDirective(realName, value, options);
+            directiveValue && (aNode.directives[realName] = directiveValue);
             break;
 
         case 'var':
@@ -83,72 +89,94 @@ function integrateAttr(aNode, name, value, options) {
             break;
 
         default:
-            integrateProp(aNode, name, value, options);
-    }
-}
-
-/**
- * 解析抽象节点绑定属性
- *
- * @inner
- * @param {ANode} aNode 抽象节点
- * @param {string} name 属性名称
- * @param {string} value 属性值
- * @param {Object} options 解析参数
- * @param {Array?} options.delimiters 插值分隔符列表
- */
-function integrateProp(aNode, name, value, options) {
-    // parse two way binding, e.g. value="{=ident=}"
-    var xMatch = value.match(/^\{=\s*(.*?)\s*=\}$/);
-
-    if (xMatch) {
-        aNode.props.push({
-            name: name,
-            expr: parseExpr(xMatch[1]),
-            x: 1,
-            raw: value
-        });
-
-        return;
-    }
-
-    // parse normal prop
-    var prop = {
-        name: name,
-        expr: parseText(value, options.delimiters),
-        raw: value
-    };
-
-    // 这里不能把只有一个插值的属性抽取
-    // 因为插值里的值可能是html片段，容易被注入
-    // 组件的数据绑定在组件init时做抽取
-    switch (name) {
-        case 'class':
-        case 'style':
-            each(prop.expr.segs, function (seg) {
-                if (seg.type === ExprType.INTERP) {
-                    seg.filters.push({
-                        type: ExprType.CALL,
-                        name: createAccessor([
-                            {
-                                type: ExprType.STRING,
-                                value: '_' + prop.name
-                            }
-                        ]),
-                        args: []
-                    });
-                }
-            });
-            break;
-
-        case 'checked':
-            if (aNode.tagName === 'input') {
-                postProp(prop);
+            if (prefix === 'prop') {
+                name = realName;
             }
-            break;
-    }
 
-    aNode.props.push(prop);
+            // parse two way binding, e.g. value="{=ident=}"
+            if (value && value.indexOf('{=') === 0 && value.slice(-2) === '=}') {
+                aNode.props.push({
+                    name: name,
+                    expr: parseExpr(value.slice(2, -2)),
+                    x: 1
+                });
+
+                return;
+            }
+
+            var expr = parseText(value || '', options.delimiters);
+            if (expr.value === '') {
+                if (boolAttrs[name]) {
+                    expr = {
+                        type: ExprType.BOOL,
+                        value: true
+                    };
+                }
+            }
+            else {
+                switch (name) {
+                    case 'class':
+                    case 'style':
+
+                        switch (expr.type) {
+                            case ExprType.TEXT:
+                                for (var i = 0, l = expr.segs.length; i < l; i++) {
+                                    if (expr.segs[i].type === ExprType.INTERP) {
+                                        expr.segs[i].filters.push({
+                                            type: ExprType.CALL,
+                                            name: {
+                                                type: ExprType.ACCESSOR,
+                                                paths: [
+                                                    {type: ExprType.STRING, value: '_' + name}
+                                                ]
+                                            },
+                                            args: []
+                                        });
+                                    }
+                                }
+                                break;
+
+                            case ExprType.INTERP:
+                                expr.filters.push({
+                                    type: ExprType.CALL,
+                                    name: {
+                                        type: ExprType.ACCESSOR,
+                                        paths: [
+                                            {type: ExprType.STRING, value: '_' + name}
+                                        ]
+                                    },
+                                    args: []
+                                });
+                                break;
+
+                            default:
+                                if (expr.type !== ExprType.STRING) {
+                                    expr = {
+                                        type: ExprType.INTERP,
+                                        expr: expr,
+                                        filters: [{
+                                            type: ExprType.CALL,
+                                            name: {
+                                                type: ExprType.ACCESSOR,
+                                                paths: [
+                                                    {type: ExprType.STRING, value: '_' + name}
+                                                ]
+                                            },
+                                            args: []
+                                        }]
+                                    }
+                                }
+                        }
+                }
+
+            }
+
+            aNode.props.push(
+                value != null
+                    ? {name: name, expr: expr}
+                    : {name: name, expr: expr, noValue: 1}
+            );
+    }
 }
 
 

@@ -1,6 +1,10 @@
 /**
+ * Copyright (c) Baidu Inc. All rights reserved.
+ *
+ * This source code is licensed under the MIT license.
+ * See LICENSE file in the project root for license information.
+ *
  * @file 读取括号表达式
- * @author errorrik(errorrik@gmail.com)
  */
 
 var readTertiaryExpr = require('./read-tertiary-expr');
@@ -12,10 +16,11 @@ var readTertiaryExpr = require('./read-tertiary-expr');
  * @return {Object}
  */
 function readParenthesizedExpr(walker) {
-    walker.go(1);
+    walker.index++;
     var expr = readTertiaryExpr(walker);
     walker.goUntil(41); // )
 
+    expr.parenthesized = true;
     return expr;
 }
 

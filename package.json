@@ -1,43 +1,28 @@
 {
   "name": "san",
-  "description": "A Flexible JavaScript Component Framework",
-  "version": "3.5.4",
-  "contributors": [
-    {
-      "name": "erik",
-      "email": "errorrik@gmail.com"
-    },
-    {
-      "name": "Otakustay",
-      "email": "otakustay@gmail.com"
-    },
-    {
-      "name": "Junmer",
-      "email": "junmer@foxmail.com"
-    },
-    {
-      "name": "Leon",
-      "email": "ludafa@outlook.com"
-    }
-  ],
+  "description": "A fast, portable, flexible JavaScript component framework",
+  "version": "3.10.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/baidu/san.git"
   },
+  "homepage": "https://baidu.github.io/san/",
   "scripts": {
     "dev": "node ./tool/dev.js",
-    "dev:unit": "./node_modules/karma/bin/karma start ./test/karma.conf.js start",
-    "pretest": "npm run build && node ./test/ssr/build-test.js",
+    "dev:unit": "npx karma start ./test/karma.conf.js start",
+    "pretest": "npm run build && NODE_PATH=dist node ./test/build-reverse-test.js && node ./test/build-spec.js",
+    "size": "npm run build && gzip -k dist/san.spa.modern.min.js && stat dist/san.spa.modern.min.js.gz && rm -f dist/*.gz",
     "test": "npm run test:unit",
-    "test:unit": "./node_modules/karma/bin/karma start ./test/karma.conf.js --single-run",
-    "test:coverage": "./node_modules/karma/bin/karma start ./test/karma.conf.js --single-run --coverage",
+    "test:unit": "npx karma start ./test/karma.conf.js --single-run",
+    "test:cov": "npm run test -- -- --coverage",
     "test:e2e": "node ./test/e2e/wdio-launcher.js",
     "test:sauce": "npm run test:e2e -- modern && npm run test:e2e -- ie_family && npm run test:e2e -- mobile",
     "test:types": "tsc -p ./types/test/tsconfig.json",
-    "build": "node ./tool/build.js"
+    "build": "node ./tool/build.js",
+    "report-cov": "cat ./coverage/report-lcov/lcov.info | ./node_modules/coveralls/bin/coveralls.js"
   },
   "types": "types",
-  "main": "dist/san.ssr.js",
+  "main": "dist/san.dev.js",
   "browser": "dist/san.dev.js",
   "unpkg": "dist/san.min.js",
   "files": [
@@ -48,21 +33,32 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "opener": "~1.4.0",
+    "@wdio/cli": "^6.6.6",
+    "@wdio/jasmine-framework": "^6.6.6",
+    "@wdio/sauce-service": "^6.6.6",
+    "@wdio/spec-reporter": "^6.6.6",
+    "art-template": "^4.10.2",
     "colors": "^1.0.3",
-    "watch": "^1.0.2",
-    "http-server": "^0.9.0",
-    "jasmine-core": "^2.5.2",
-    "karma": "^1.5.0",
+    "coveralls": "^3.0.1",
+    "ejs": "^2.6.1",
+    "etpl": "^3.2.0",
+    "handlebars": "^4.0.12",
+    "http-server": "^0.11.1",
+    "jasmine-core": "^2.99.1",
+    "karma": "^4.0.1",
     "karma-chrome-launcher": "^2.0.0",
-    "karma-coverage": "^1.1.1",
-    "karma-jasmine": "^1.1.0",
-    "wdio-jasmine-framework": "^0.3.0",
-    "wdio-sauce-service": "^0.3.1",
-    "wdio-spec-reporter": "^0.1.0",
-    "webdriverio": "^4.2.16",
+    "karma-coverage": "^1.1.2",
+    "karma-jasmine": "^2.0.1",
+    "karma-remap-istanbul": "^0.6.0",
+    "karma-sourcemap-loader": "^0.3.7",
+    "mustache": "^3.0.1",
+    "opener": "^1.5.1",
+    "san-anode-cases": "^3.10.1",
+    "san-html-cases": "^3.10.13",
+    "source-map": "^0.7.3",
+    "swig-templates": "^2.0.3",
     "uglify-js": "^2.8.22",
-    "swig": "^1.4.2",
-    "art-template": "^4.10.2"
+    "watch": "^1.0.2",
+    "webdriverio": "^6.6.6"
   }
 }
